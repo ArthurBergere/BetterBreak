@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 class SocialPage extends StatefulWidget {
   const SocialPage({super.key});
@@ -13,8 +14,9 @@ class _SocialPageState extends State<SocialPage> {
   late final WebViewController _controller;
   String currentUrl = 'https://www.instagram.com';
   int socialBurstTimeLimit = 10;
-  Set<int> selectedHours = {};
+  int remainingTime = 600;
   bool isBlocked = false;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -29,16 +31,25 @@ class _SocialPageState extends State<SocialPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       socialBurstTimeLimit = prefs.getInt('socialBurstTimeLimit') ?? 10;
-      selectedHours = (prefs.getStringList('selectedHours') ?? [])
-          .map((e) => int.parse(e))
-          .toSet();
+      remainingTime = prefs.getInt('remainingTime') ?? (socialBurstTimeLimit * 60);
     });
+    _startTimer();
   }
 
-  Future<void> _saveUserSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('socialBurstTimeLimit', socialBurstTimeLimit);
-    await prefs.setStringList('selectedHours', selectedHours.map((e) => e.toString()).toList());
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (remainingTime > 0) {
+        setState(() {
+          remainingTime--;
+        });
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('remainingTime', remainingTime);
+      } else {
+        _blockSocialMedia();
+        timer.cancel();
+      }
+    });
   }
 
   void _loadUrl(String url) {
@@ -56,11 +67,26 @@ class _SocialPageState extends State<SocialPage> {
   }
 
   @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Réseaux Sociaux'),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: Text(
+                "${remainingTime ~/ 60} min ${remainingTime % 60} sec",
+                style: const TextStyle(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.replay),
             onPressed: () => _controller.reload(),
@@ -74,19 +100,34 @@ class _SocialPageState extends State<SocialPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.camera_alt, size: 30, color: Colors.purple),
-                  onPressed: () => _loadUrl('https://www.instagram.com'),
+                Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt, size: 30, color: Colors.purple),
+                      onPressed: () => _loadUrl('https://www.instagram.com'),
+                    ),
+                    const Text("Instagram", style: TextStyle(fontSize: 12))
+                  ],
                 ),
                 const SizedBox(width: 20),
-                IconButton(
-                  icon: const Icon(Icons.language, size: 30, color: Colors.blue),
-                  onPressed: () => _loadUrl('https://www.twitter.com'),
+                Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.language, size: 30, color: Colors.blue),
+                      onPressed: () => _loadUrl('https://www.twitter.com'),
+                    ),
+                    const Text("Twitter", style: TextStyle(fontSize: 12))
+                  ],
                 ),
                 const SizedBox(width: 20),
-                IconButton(
-                  icon: const Icon(Icons.business, size: 30, color: Colors.blueGrey),
-                  onPressed: () => _loadUrl('https://www.linkedin.com'),
+                Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.business, size: 30, color: Colors.blueGrey),
+                      onPressed: () => _loadUrl('https://www.linkedin.com'),
+                    ),
+                    const Text("LinkedIn", style: TextStyle(fontSize: 12))
+                  ],
                 ),
               ],
             ),
