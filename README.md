@@ -69,6 +69,6 @@
    ```
 
 ---
-📩 **Contact développeur** : [email@example.com]  
-🚀 **Bon développement !**
+
+
 
